@@ -1,0 +1,60 @@
+name: Gerar APK Android
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compilar o APK
+        working-directory: android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../build.log
+
+      - name: Preparar arquivo
+        run: cp android/app/build/outputs/apk/release/app-release.apk "HorasExtras-v1.0.${{ github.run_number }}.apk"
+
+      - name: Publicar versão (Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Horas Extras v1.0.${{ github.run_number }}
+          make_latest: true
+          files: HorasExtras-v1.0.${{ github.run_number }}.apk
+          body: |
+            Baixe o arquivo **HorasExtras-v1.0.${{ github.run_number }}.apk** abaixo, no celular, e toque nele para instalar.
+            Se o Android pedir, permita "instalar apps desta fonte". Versões novas instalam por cima e mantêm os seus dados.
+
+      - name: Guardar log em caso de erro
+        if: failure()
+        run: |
+          mkdir -p /tmp/logs
+          cp build.log /tmp/logs/build.log 2>/dev/null || echo "sem log de build" > /tmp/logs/build.log
+          cd /tmp/logs
+          git init -q
+          git checkout -q -b ci-logs
+          git add build.log
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "log da execução ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-logs

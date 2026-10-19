@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+// número da versão = número da execução no GitHub (cada nova versão instala por cima da anterior)
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'br.com.horasextras'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'br.com.horasextras'
+        minSdk 24
+        targetSdk 34
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../keystore/horasextras.jks')
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'horasextras'
+            keyAlias 'horasextras'
+            keyPassword System.getenv('KEYSTORE_PASSWORD') ?: 'horasextras'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    // o site (pasta web/ na raiz do repositório) vai dentro do APK
+    sourceSets {
+        main {
+            assets.srcDirs = ['../../web']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
