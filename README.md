@@ -7,6 +7,12 @@ leitura de prints/PDF do espelho de ponto e do holerite, e **conferência espelh
 
 Contas por CPF + PIN (até 3 por aparelho). Hoje em **modo local** (dados no aparelho); o servidor está preparado em `server/`.
 
+## Site
+
+O app também roda no navegador: **https://victorhugodiogo.github.io/horas-extras-app/**
+Publicado automaticamente pela pasta `web/` a cada alteração (aba Actions → *Publicar site*).
+No celular, abra no Chrome e toque em "Instalar app" para ter o ícone na tela inicial.
+
 ## Instalar no Android
 
 1. Abra a página **Releases** deste repositório no celular (logado no GitHub).
