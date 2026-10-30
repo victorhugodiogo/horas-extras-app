@@ -5,6 +5,18 @@ Esta pasta tem tudo para passar ao **modo servidor** (seções 8, 9, 12 e 14 do 
 dados sincronizados entre celular e computador, tentativas e bloqueios controlados no servidor,
 CAPTCHA invisível e recuperação de PIN por e-mail.
 
+## Caminho recomendado: um único arquivo
+
+**`supabase/setup.sql`** instala tudo pelo SQL Editor do Supabase, sem linha de comando:
+tabelas fechadas (RLS), funções `he_*` chamadas pelo app (criar conta, entrar com CAPTCHA e bloqueio progressivo,
+carregar/salvar dados, recuperar PIN por e-mail, excluir conta), perfis de convenção e retenção de 3 meses.
+Testado em PostgreSQL 16. Passo a passo completo: **`docs/guia-criar-supabase.md`**.
+
+## Alternativa avançada (Edge Functions)
+
+Os arquivos abaixo fazem o mesmo usando Edge Functions + Turnstile (exigem a linha de comando do Supabase).
+Use só se precisar do CAPTCHA invisível da Cloudflare.
+
 ## O que tem aqui
 
 | Arquivo | Função |
