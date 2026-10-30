@@ -305,6 +305,9 @@ table.calc{border-collapse:collapse;width:100%}
         <button class="primary block" type="submit">Entrar</button>
       </form>
       <div class="links"><button class="link" id="goForgot" type="button">Esqueci meu PIN</button><button class="link" id="goCreate" type="button">Criar conta</button></div>
+      <div class="info" id="firstHint" hidden></div>
+      <button class="block" id="goImpAcc" type="button">Trazer conta de outro aparelho</button>
+      <input type="file" id="impAccFile" accept=".json,application/json" hidden>
     </section>
 
     <section id="vCreate" class="card" hidden>
@@ -328,7 +331,7 @@ table.calc{border-collapse:collapse;width:100%}
       <div class="links"><button class="link" id="backLogin2" type="button">Voltar para entrar</button></div>
     </section>
 
-    <p class="localnote">Modo local: suas contas e cálculos ficam salvos só neste aparelho. Quando o servidor for ligado, a recuperação de PIN passa a ser por código no e-mail e os dados sincronizam entre celular e computador.</p>
+    <p class="localnote">Modo local: cada conta fica salva só no aparelho (navegador) onde foi criada. Para usar a mesma conta no celular e no computador, faça o backup em Configuração → Dados e use "Trazer conta de outro aparelho". Quando o servidor for ligado, isso passa a ser automático.</p>
   </div>
 </div>
 
@@ -576,7 +579,7 @@ table.calc{border-collapse:collapse;width:100%}
 
           <div class="card">
             <h2>Dados</h2>
-            <p class="hint" style="margin:4px 0 12px">Backup completo desta conta (todos os meses guardados e a configuração).</p>
+            <p class="hint" style="margin:4px 0 12px">Backup completo desta conta (conta, configuração e meses guardados). Use o arquivo em outro aparelho: na tela de login, "Trazer conta de outro aparelho".</p>
             <div class="row">
               <button id="backup">Fazer backup</button>
               <button id="restore">Restaurar backup</button>
@@ -674,6 +677,19 @@ table.calc{border-collapse:collapse;width:100%}
       <div id="pinCap" class="captcha" hidden><span>Verificação de segurança</span><label id="pinCapQ" for="pinCapA"></label><input id="pinCapA" inputmode="numeric" maxlength="3" autocomplete="off"></div>
       <p id="pinMsg" class="msg" role="alert"></p>
       <div class="row"><span class="sp"></span><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Entrar</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="mImpAcc" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mImpAccT">
+  <div class="mbox sm">
+    <h2 id="mImpAccT">Trazer conta de outro aparelho</h2>
+    <div class="row" id="iaWho"></div>
+    <p class="hint" style="margin:0" id="iaInfo"></p>
+    <form id="fImpAcc" style="display:grid;gap:10px" novalidate>
+      <label>PIN da conta<input id="iaPin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password"></label>
+      <p id="iaMsg" class="msg" role="alert"></p>
+      <div class="row"><span class="sp"></span><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Trazer conta</button></div>
     </form>
   </div>
 </div>
@@ -1924,9 +1940,53 @@ function showAuth(v){
     $('#savedList').innerHTML = accounts.length ? `<span class="muted" style="font-size:12px">Contas neste aparelho</span>` + accounts.map(a =>
       `<button class="accbtn" type="button" data-acc="${a.id}"><span class="av">${esc(initial(a.apelido))}</span><span><b>${esc(a.apelido)}</b><br><small>${cpfMask(a.cpf)}</small></span></button>`).join('') : '';
     $('#goCreate').disabled = accounts.length >= 3;
+    const legacy = load('he_data', null) || load('he_cfg', null);
+    $('#firstHint').hidden = accounts.length > 0;
+    $('#firstHint').innerHTML = legacy ? 'Primeira vez nesta versão? Toque em <b>Criar conta</b>: os lançamentos já salvos neste aparelho vão para a sua conta.'
+      : 'Primeira vez neste aparelho? Toque em <b>Criar conta</b>. Se você já criou a conta em outro aparelho, use <b>Trazer conta de outro aparelho</b>.';
   }
 }
 $('#goCreate').onclick = () => showAuth('create');
+
+/* ---------- trazer conta de outro aparelho (arquivo de backup) ---------- */
+let impAcc = null;
+$('#goImpAcc').onclick = () => $('#impAccFile').click();
+$('#impAccFile').onchange = e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  f.text().then(t => {
+    let o; try { o = JSON.parse(t); } catch (x) { o = null; }
+    const a = o && o.conta;
+    if (!a || !a.cpf || !a.pinHash || !a.salt) { toast('Este arquivo não traz uma conta. Gere o backup em Configuração → Dados → Fazer backup, no aparelho onde a conta foi criada.'); return; }
+    const exists = accounts.find(x => x.cpf === a.cpf);
+    if (!exists && accounts.length >= 3) { toast('Limite de 3 contas neste aparelho. Remova uma para trazer outra.'); return; }
+    impAcc = o;
+    $('#iaWho').innerHTML = `<span class="av">${esc(initial(a.apelido))}</span><span><b>${esc(a.apelido)}</b><br><small>${cpfMask(a.cpf)} · ${esc((PERFIS[a.conv]||PERFIS.clt).nome)}</small></span>`;
+    const meses = Object.keys(o.data || {}).filter(k => Object.keys(o.data[k]||{}).length).sort().map(monthLabel);
+    $('#iaInfo').textContent = (meses.length ? 'Traz os lançamentos de ' + meses.join(', ') + '. ' : '') + (exists ? 'Esta conta já existe neste aparelho: os dados dela aqui serão substituídos pelos do arquivo.' : 'Confirme com o PIN da conta.');
+    $('#iaPin').value = ''; $('#iaMsg').textContent = '';
+    openModal('mImpAcc');
+  });
+};
+$('#fImpAcc').addEventListener('submit', async e => {
+  e.preventDefault(); const o = impAcc; if (!o) return;
+  const a = o.conta, pin = $('#iaPin').value, s = secOf(a.cpf);
+  if (s.until > Date.now()) { $('#iaMsg').innerHTML = lockText(s.until); return; }
+  const ok = /^\d{4}$/.test(pin) && (await hashPin(pin, a.salt, a.algo || 'pbkdf2')) === a.pinHash;
+  if (!ok) {
+    s.err++; if (s.err >= 5) { s.lvl = Math.min(s.lvl + 1, LOCK_MIN.length); s.until = Date.now() + LOCK_MIN[s.lvl-1]*60000; s.err = 3; }
+    sec[a.cpf] = s; store('he_sec', sec);
+    $('#iaMsg').innerHTML = s.until > Date.now() ? lockText(s.until, LOCK_MIN[s.lvl-1]) : `PIN incorreto. Tentativas restantes antes do bloqueio: ${5 - s.err}.`;
+    return;
+  }
+  delete sec[a.cpf]; store('he_sec', sec);
+  const prev = accounts.find(x => x.cpf === a.cpf);
+  const acc = Object.assign({}, a, {id: prev ? prev.id : (a.id || 'a' + Date.now().toString(36))});
+  if (accounts.some(x => x.id === acc.id && x.cpf !== acc.cpf)) acc.id = 'a' + Date.now().toString(36);
+  store('he_acc_' + acc.id, {cfg: o.cfg || {}, data: o.data || {}, pays: o.pays || {}, ret: {}});
+  accounts = accounts.filter(x => x.cpf !== a.cpf).concat([acc]); saveAccounts();
+  impAcc = null; closeModal('mImpAcc');
+  enterAccount(acc, 'Conta trazida para este aparelho.');
+});
 $('#goForgot').onclick = () => showAuth('forgot');
 $('#backLogin1').onclick = () => showAuth('login');
 $('#backLogin2').onclick = () => showAuth('login');
@@ -1939,6 +1999,8 @@ $('#fLogin').addEventListener('submit', async e => {
   const cpf = digits($('#lgCpf').value), pin = $('#lgPin').value, msg = $('#lgMsg');
   msg.textContent = '';
   if (cpf.length !== 11) { msg.textContent = 'Informe um CPF com 11 dígitos.'; return; }
+  // modo local: a conta só existe no aparelho onde foi criada (ou trazida por backup)
+  if (!accounts.some(x => x.cpf === cpf)) { msg.textContent = 'Este CPF não tem conta salva neste aparelho. Se você criou a conta em outro aparelho, use "Trazer conta de outro aparelho" com o arquivo de backup. Se é a primeira vez, toque em "Criar conta".'; return; }
   const s = secOf(cpf);
   if (s.until > Date.now()) { $('#lockBox').hidden = false; $('#lockBox').innerHTML = lockText(s.until); return; }
   if (needsCap(cpf)) {
@@ -2010,7 +2072,7 @@ $('#delAcc').onclick = async () => {
   const id = cur.id, cpf = cur.cpf;
   drop('he_acc_' + id); accounts = accounts.filter(a => a.id !== id); saveAccounts(); delete sec[cpf]; store('he_sec', sec);
   drop('he_session'); cur = null; $('#app').hidden = true; document.body.classList.remove('inapp');
-  showAuth(accounts.length ? 'login' : 'create'); toast('Conta e dados excluídos deste aparelho.');
+  showAuth('login'); toast('Conta e dados excluídos deste aparelho.');
 };
 
 /* convenção (combobox com busca) */
@@ -2122,9 +2184,14 @@ function exportAll(){
   download(`horas-extras-${ym}.csv`, csvMonth(ym), 'text/csv;charset=utf-8');
   toast('Exportação gerada (JSON + CSV, com a configuração usada).');
 }
+function backupObj(a, st){
+  const {id, cpf, email, apelido, conv, salt, algo, pinHash, criadoEm, consentimentoEm} = a;
+  return {app:'Hora Extra', tipo:'backup-conta', versao:APP_VERSION, geradoEm:new Date().toISOString(),
+    conta:{id, cpf, email, apelido, conv, salt, algo, pinHash, criadoEm, consentimentoEm}, cfg:st.cfg, data:st.data, pays:st.pays};
+}
 function exportAccount(a){
   const st = load('he_acc_' + a.id, {});
-  download(`hora-extra-${a.apelido.replace(/\W+/g,'-').toLowerCase()}-backup.json`, JSON.stringify({app:'Hora Extra', versao:APP_VERSION, conta:{apelido:a.apelido, cpf:cpfMask(a.cpf), convencao:a.conv}, cfg:st.cfg, data:st.data, pays:st.pays}, null, 2), 'application/json');
+  download(`backup-hora-extra-${a.apelido.replace(/\W+/g,'-').toLowerCase()}.json`, JSON.stringify(backupObj(a, st), null, 2), 'application/json');
 }
 $('#csv').onclick = () => download(`horas-extras-${ym}.csv`, csvMonth(ym), 'text/csv;charset=utf-8');
 $('#exportMonth').onclick = () => { $('#mExpT').textContent = 'Exportar ' + monthLabel(ym); openModal('mExport'); };
@@ -2140,7 +2207,7 @@ function printPage(){
 }
 $('#print').onclick = printPage;
 $('#printHelpClose').onclick = () => { $('#printHelp').hidden = true; };
-$('#backup').onclick = () => download(`backup-hora-extra-${cur.apelido.replace(/\W+/g,'-').toLowerCase()}.json`, JSON.stringify({app:'Hora Extra', versao:APP_VERSION, cfg, data, pays}, null, 2), 'application/json');
+$('#backup').onclick = () => { download(`backup-hora-extra-${cur.apelido.replace(/\W+/g,'-').toLowerCase()}.json`, JSON.stringify(backupObj(cur, {cfg, data, pays}), null, 2), 'application/json'); toast('Backup salvo. Para usar em outro aparelho: tela de login → Trazer conta de outro aparelho.'); };
 $('#restore').onclick = () => $('#file').click();
 $('#file').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2460,7 +2527,7 @@ function init(){
     enterAccount(acc);
     const qt = new URLSearchParams(location.search).get('tab');
     if (qt) showTab(qt);
-  } else showAuth(accounts.length ? 'login' : 'create');
+  } else showAuth('login');
 }
 init();
 
