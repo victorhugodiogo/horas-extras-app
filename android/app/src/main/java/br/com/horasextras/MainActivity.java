@@ -82,14 +82,30 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
-                String type = "*/*";
+                // tipos aceitos pela página (ex.: "image/*,application/pdf,.pdf")
+                java.util.ArrayList<String> mimes = new java.util.ArrayList<>();
                 String[] accept = params.getAcceptTypes();
-                if (accept != null && accept.length > 0 && accept[0] != null && accept[0].startsWith("image/")) {
-                    type = "image/*";
+                if (accept != null) {
+                    for (String a : accept) {
+                        if (a == null) continue;
+                        for (String part : a.split(",")) {
+                            String t = part.trim();
+                            if (t.equals(".pdf")) t = "application/pdf";
+                            if (t.equals(".json")) t = "application/json";
+                            if (t.contains("/") && !mimes.contains(t)) mimes.add(t);
+                        }
+                    }
                 }
                 Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType(type);
+                if (mimes.contains("application/json") || mimes.isEmpty()) {
+                    i.setType("*/*");                 // backups .json podem vir sem tipo definido
+                } else if (mimes.size() == 1) {
+                    i.setType(mimes.get(0));
+                } else {
+                    i.setType("*/*");
+                    i.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[0]));
+                }
                 if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
                     i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 }

@@ -1,7 +1,11 @@
-# Horas Extras CLT
+# Hora Extra — horas extras pela CLT e pela convenção coletiva
 
-Calculadora de horas extras de acordo com a CLT: adicional de 50%/100%, adicional noturno com hora reduzida,
-prorrogação após as 5h (Súmula 60, II TST), reflexo no DSR, total líquido (INSS e IRRF 2026) e leitura de prints do espelho de ponto.
+Calcula e confere horas extras pela **convenção coletiva** de cada pessoa (perfis "CLT mínimo" e "FEAAC/SEAAC × SESCON-SP"):
+faixas por dia (ex.: 60% nas 2 primeiras, 80% nas excedentes), 100% em domingos, feriados e dias compensados, adicional noturno com
+hora reduzida e prorrogação após as 5h, reflexo no DSR, banco de horas com vencimento, data de corte da folha, total líquido (INSS e IRRF 2026),
+leitura de prints/PDF do espelho de ponto e do holerite, e **conferência espelho × holerite** com alertas e perguntas para o RH.
+
+Contas por CPF + PIN (até 3 por aparelho). Hoje em **modo local** (dados no aparelho); o servidor está preparado em `server/`.
 
 ## Instalar no Android
 
@@ -17,6 +21,7 @@ Versões novas instalam por cima da anterior e mantêm os lançamentos.
 |---|---|
 | `web/` | O app em si (HTML/CSS/JS, um arquivo). Funciona também como site/PWA. |
 | `android/` | Projeto Android que empacota a pasta `web/` num APK (WebView). |
+| `server/` | Banco de dados e funções de login (Supabase), prontos para ligar. |
 | `.github/workflows/android.yml` | Gera e publica o APK automaticamente a cada alteração em `web/` ou `android/`. |
 
 ## Atualizar o app
